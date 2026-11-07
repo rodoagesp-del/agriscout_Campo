@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AgriScout - Monitoreo de Campo</title>
+    
+    <!-- Metadatos PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#059669">
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/059669/ffffff?text=AS">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet JS for Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Leaflet Geoman para edición de polígonos -->
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+    <!-- html2pdf for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js para gráficas temporales -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- ARCHIVO CSS ENLAZADO -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="flex flex-col h-screen overflow-hidden text-slate-800 relative">
+
+    <!-- PANTALLA DE CARGA BLOQUEANTE -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-emerald-900 z-[9999] flex flex-col items-center justify-center text-white transition-opacity duration-500">
+        <i class="fa-solid fa-cloud-arrow-down text-6xl mb-4 animate-bounce"></i>
+        <h2 class="text-3xl font-black mb-2">Sincronizando...</h2>
+        <p class="text-emerald-200 text-sm font-medium px-8 text-center">Descargando última versión de la base de datos para no sobreescribir información.</p>
+    </div>
+
+    <!-- Top Header -->
+    <header class="bg-emerald-600 text-white p-3 shadow-md z-10 flex justify-between items-center shrink-0">
+        <h1 class="text-lg font-bold"><i class="fa-solid fa-leaf mr-2"></i>AgriScout - Modo Campo</h1>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-hidden flex flex-col relative" id="mainContainer">
+        
+        <!-- TAB 1: Evaluar (Mapa 1/3 + Formulario 2/3) -->
+        <section id="tab-eval" class="tab-content active h-full flex flex-col">
+            
+            <!-- MAPA (1/3 Superior) -->
+            <div class="h-1/3 min-h-[200px] w-full relative z-0 border-b-4 border-emerald-600 shadow-md shrink-0">
+                <div id="map" class="w-full h-full"></div>
+                <!-- Botón flotante para recentrar -->
+                <button onclick="centerMapOnUser()" class="absolute bottom-4 right-4 z-[400] bg-blue-600 text-white p-3 rounded-full shadow-lg border-2 border-white">
+                    <i class="fa-solid fa-location-crosshairs"></i>
+                </button>
+            </div>
+
+            <!-- FORMULARIO DE EVALUACIÓN (2/3 Inferior con scroll) -->
+            <div class="flex-1 overflow-y-auto p-4 bg-gray-100 pb-24">
+                
+                <div id="evalStartScreen" class="bg-white rounded-lg shadow-sm border p-6 text-center mt-4">
+                    <button class="bg-emerald-600 text-white w-32 h-32 rounded-full font-bold text-xl shadow-lg shadow-emerald-200 flex flex-col items-center justify-center mx-auto hover:bg-emerald-700 transition active:scale-95" onclick="startEvaluation()">
+                        <i class="fa-solid fa-tree text-4xl mb-2"></i> INICIAR
+                    </button>
+                    <p class="text-sm text-slate-500 mt-4 font-medium">Registrar nuevo árbol en GPS actual</p>
+                </div>
+
+                <div id="evaluationForm" class="hidden bg-white rounded-lg shadow border p-4">
+                    <!-- Cabecera de Ubicación con Botón de Actualizar -->
+                    <div class="mb-4 border-b pb-3 flex justify-between items-start">
+                        <div>
+                            <p class="font-semibold text-emerald-800 text-sm uppercase">Sector Detectado:</p>
+                            <p id="evalZoneName" class="text-xl font-black text-slate-700">Calculando...</p>
+                        </div>
+                        <button onclick="updateCurrentSector()" class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-2 rounded shadow-sm text-xs font-bold flex flex-col items-center transition">
+                            <i class="fa-solid fa-rotate-right mb-1 text-base"></i> Actualizar
+                        </button>
+                    </div>
+                    
+                    <!-- Selector de Tipo de Árbol -->
+                    <div id="evalTreeTypeContainer" class="mb-4">
+                        <label class="text-xs font-bold text-blue-800 uppercase block mb-1">Variedad de Árbol:</label>
+                        <select id="evalTreeTypeSelect" class="w-full border-2 border-blue-200 p-3 rounded-lg bg-blue-50 text-blue-900 font-bold outline-none focus:border-blue-500 text-base"></select>
+                    </div>
+
+                    <div id="evalCategoriesContainer" class="flex flex-col gap-4 mb-6">
+                        <!-- El checklist dinámico se inyecta aquí -->
+                    </div>
+
+                    <div class="flex gap-2 mt-4 sticky bottom-0 bg-white py-2 border-t">
+                        <button class="bg-slate-200 text-slate-700 py-4 px-4 rounded-lg flex-1 shadow font-bold" onclick="cancelEvaluation()">Cancelar</button>
+                        <button class="bg-emerald-600 text-white py-4 px-4 rounded-lg flex-1 shadow-lg font-black text-lg flex items-center justify-center" onclick="safeSaveAndUpload()" id="btnSaveEval">
+                            <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Guardar y Subir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: Reportes -->
+        <section id="tab-report" class="tab-content overflow-y-auto h-full p-4 pb-24 hidden">
+            <h2 class="text-2xl font-bold mb-4 text-emerald-800">Reportes de Campo</h2>
+            
+            <div class="bg-white rounded-lg shadow p-4 mb-4">
+                <!-- Filtros Principales -->
+                <div class="flex flex-col sm:flex-row gap-2 mb-2">
+                    <select id="reportZoneSelect" class="border p-2 rounded flex-1 bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-semibold text-sm" onchange="refreshCurrentReport()">
+                        <option value="all">Todas las Zonas (Desglose General)</option>
+                    </select>
+                    <select id="reportTreeTypeSelect" class="border p-2 rounded flex-1 bg-white outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-blue-800 text-sm hidden" onchange="refreshCurrentReport()">
+                        <option value="all">Todas las Variedades</option>
+                    </select>
+                </div>
+
+                <!-- Filtros de Fecha -->
+                <div class="flex flex-col sm:flex-row gap-2 mb-4 items-end border-b border-gray-200 pb-4">
+                    <div class="flex-1 w-full">
+                        <label class="text-xs font-bold text-slate-500 uppercase">Desde (Fecha):</label>
+                        <input type="date" id="reportDateStart" class="border p-2 rounded w-full outline-none focus:ring-2 focus:ring-emerald-500 text-sm" onchange="refreshCurrentReport()">
+                    </div>
+                    <div class="flex-1 w-full">
+                        <label class="text-xs font-bold text-slate-500 uppercase">Hasta (Fecha):</label>
+                        <input type="date" id="reportDateEnd" class="border p-2 rounded w-full outline-none focus:ring-2 focus:ring-emerald-500 text-sm" onchange="refreshCurrentReport()">
+                    </div>
+                    <div class="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                        <button class="bg-slate-200 text-slate-700 py-2 px-3 rounded shadow-sm flex-1 sm:flex-none font-bold text-sm hover:bg-slate-300" onclick="clearDateFilters()" title="Limpiar Fechas">
+                            <i class="fa-solid fa-eraser"></i>
+                        </button>
+                        <button class="bg-red-500 text-white py-2 px-4 rounded shadow flex-1 sm:flex-none font-bold text-sm" onclick="exportPDF()" id="btnExportPDF">
+                            <i class="fa-solid fa-file-pdf mr-1"></i> PDF
+                        </button>
+                        <button class="bg-green-600 text-white py-2 px-4 rounded shadow flex-1 sm:flex-none font-bold text-sm" onclick="exportCSV()">
+                            <i class="fa-solid fa-file-excel mr-1"></i> Datos Crudos
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Selectores de Vista -->
+                <div class="flex gap-2 mb-4">
+                    <button id="btnViewVisual" class="flex-1 py-2 font-bold rounded-lg bg-emerald-600 text-white shadow text-sm" onclick="switchReportView('visual')"><i class="fa-solid fa-chart-pie mr-1"></i>Vista Visual</button>
+                    <button id="btnViewTable" class="flex-1 py-2 font-bold rounded-lg bg-slate-200 text-slate-600 hover:bg-slate-300 text-sm" onclick="switchReportView('table')"><i class="fa-solid fa-table mr-1"></i>Tabla Histórica</button>
+                    <button id="btnViewChart" class="flex-1 py-2 font-bold rounded-lg bg-slate-200 text-slate-600 hover:bg-slate-300 text-sm" onclick="switchReportView('chart')"><i class="fa-solid fa-chart-line mr-1"></i>Evolución</button>
+                </div>
+
+                <!-- Opciones extra para la tabla -->
+                <div id="tableOptionsContainer" class="hidden mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <label class="flex items-center gap-2 font-bold text-sm text-blue-900 cursor-pointer">
+                        <input type="checkbox" id="chkDiffTreeType" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" onchange="generateTableReport()">
+                        Diferenciar filas por Variedad de Árbol
+                    </label>
+                    <div class="flex gap-2">
+                        <button onclick="exportTableToPDF()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-bold shadow flex items-center">
+                            <i class="fa-solid fa-file-pdf mr-2"></i> PDF
+                        </button>
+                        <button onclick="exportTableToCSV()" class="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1.5 rounded text-sm font-bold shadow flex items-center">
+                            <i class="fa-solid fa-file-excel mr-2"></i> CSV
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Opciones extra para las gráficas de evolución -->
+                <div id="chartOptionsContainer" class="hidden mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg flex flex-col gap-3">
+                    <div class="flex flex-col sm:flex-row gap-2 w-full">
+                        <div class="flex-1">
+                            <label class="text-xs font-bold text-purple-800 uppercase block mb-1">Categoría:</label>
+                            <select id="chartCategorySelect" class="w-full border border-purple-300 p-2 rounded bg-white text-purple-900 font-semibold outline-none focus:ring-2 focus:ring-purple-500 text-sm" onchange="updateChartItemSelect()"></select>
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-xs font-bold text-purple-800 uppercase block mb-1">Viñeta a graficar:</label>
+                            <select id="chartItemSelect" class="w-full border border-purple-300 p-2 rounded bg-white text-purple-900 font-semibold outline-none focus:ring-2 focus:ring-purple-500 text-sm" onchange="generateChartReport()"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contenedor Vista Visual -->
+                <div id="reportContent" class="bg-slate-50 p-4 border rounded">
+                    <div class="text-center mb-6">
+                        <h1 class="text-3xl font-black text-emerald-800">REPORTE DE CAMPO</h1>
+                        <p id="reportDate" class="text-slate-500 text-sm font-medium mt-1"></p>
+                        <p id="reportZoneTitle" class="font-bold mt-2 text-lg text-slate-700">Filtro: Todos los sectores</p>
+                    </div>
+                    
+                    <div id="reportMapContainer" class="mb-6 h-64 w-full rounded border-2 border-slate-300 z-0 relative"></div>
+                    
+                    <div id="reportStats" class="flex flex-col gap-6"></div>
+                </div>
+
+                <!-- Contenedor Vista Tabla -->
+                <div id="tableContent" class="hidden overflow-x-auto bg-white border rounded-lg shadow-sm">
+                    <div id="tableContainer" class="min-w-max"></div>
+                </div>
+
+                <!-- Contenedor Vista Gráfica -->
+                <div id="chartContent" class="hidden bg-white border rounded-lg shadow-sm p-4">
+                    <div class="text-center mb-4">
+                        <h3 id="chartTitle" class="text-xl font-black text-purple-900">Evolución en el Tiempo</h3>
+                        <p id="chartSubtitle" class="text-sm font-medium text-slate-500"></p>
+                    </div>
+                    <div class="relative w-full h-80">
+                        <canvas id="evolutionChart"></canvas>
+                    </div>
+                    <div id="chartNoDataMsg" class="hidden text-center py-10 text-slate-400 font-bold">No hay suficientes datos para generar la gráfica con estos filtros.</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Navigation (Solo Evaluar y Reportes) -->
+    <nav class="bg-white border-t-2 border-gray-200 fixed bottom-0 w-full z-20 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <ul class="flex justify-around">
+            <li class="flex-1">
+                <button class="w-full py-3 text-emerald-600 flex flex-col items-center nav-btn active" onclick="switchTab('eval', this)">
+                    <i class="fa-solid fa-clipboard-check text-2xl mb-1"></i>
+                    <span class="text-[11px] font-black uppercase">Evaluar</span>
+                </button>
+            </li>
+            <li class="flex-1">
+                <button class="w-full py-3 text-slate-400 flex flex-col items-center nav-btn" onclick="switchTab('report', this)">
+                    <i class="fa-solid fa-chart-pie text-2xl mb-1"></i>
+                    <span class="text-[11px] font-black uppercase">Reportes</span>
+                </button>
+            </li>
+        </ul>
+    </nav>
+    <div id="toast" class="fixed top-10 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl transition-opacity duration-300 opacity-0 pointer-events-none z-[10000] font-bold text-center text-sm border border-slate-700"></div>
+
+    <!-- ARCHIVOS JS MODULARIZADOS -->
+    <script src="js/data.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/evaluation.js"></script>
+    <script src="js/reports.js"></script>
+    <script src="js/main.js"></script>
+
+</body>
+</html>
