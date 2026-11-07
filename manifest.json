@@ -1,6 +1,7 @@
 {
-  "name": "AgriScout Monitoreo",
-  "short_name": "AgriScout",
+  "name": "AgriScout - Modo Campo",
+  "short_name": "AS Campo",
+  "description": "Herramienta de muestreo en campo sin sobreescritura de datos.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f3f4f6",

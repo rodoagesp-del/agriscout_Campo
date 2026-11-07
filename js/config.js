@@ -5,6 +5,8 @@
 // --- CONFIG (TIPOS DE ÁRBOL) ---
 function renderTreeTypes() {
     const list = document.getElementById('treeTypesList');
+    if (!list) return; // ✅ GUARD: Si no existe el contenedor, abortar sin error
+    
     list.innerHTML = '';
     if (!appData.treeTypes || appData.treeTypes.length === 0) {
         list.innerHTML = '<li class="text-xs text-slate-400 italic">No hay variedades configuradas.</li>';
@@ -21,12 +23,14 @@ function renderTreeTypes() {
 }
 
 function addTreeType() {
-    const name = document.getElementById('newTreeTypeName').value.trim();
+    const input = document.getElementById('newTreeTypeName');
+    if (!input) return;
+    const name = input.value.trim();
     if (name) {
         if (!appData.treeTypes) appData.treeTypes = [];
         appData.treeTypes.push({ id: 'tt_' + Date.now(), name: name });
         saveData();
-        document.getElementById('newTreeTypeName').value = '';
+        input.value = '';
         renderTreeTypes();
     }
 }
@@ -42,6 +46,8 @@ function deleteTreeType(id) {
 // --- CONFIG (CATEGORIAS) ---
 function renderCategories() {
     const container = document.getElementById('categoriesContainer');
+    if (!container) return; // ✅ GUARD: Abortar si estamos en Modo Campo sin Config
+    
     container.innerHTML = '';
     appData.categories.forEach(cat => {
         let itemsHTML = cat.items.map(item => {
@@ -109,11 +115,13 @@ function renderCategories() {
 }
 
 function addCategory() {
-    const name = document.getElementById('newCatName').value.trim();
+    const input = document.getElementById('newCatName');
+    if (!input) return;
+    const name = input.value.trim();
     if (name) {
         appData.categories.push({ id: 'cat_' + Date.now(), name: name, items: [] });
         saveData();
-        document.getElementById('newCatName').value = '';
+        input.value = '';
         renderCategories();
     }
 }
@@ -127,8 +135,11 @@ function deleteCategory(id) {
 }
 
 function addItem(catId) {
-    const name = document.getElementById(`newItem_${catId}`).value.trim();
-    const type = document.getElementById(`newType_${catId}`).value;
+    const nameInput = document.getElementById(`newItem_${catId}`);
+    const typeInput = document.getElementById(`newType_${catId}`);
+    if (!nameInput || !typeInput) return;
+    const name = nameInput.value.trim();
+    const type = typeInput.value;
     if (name) {
         let newItem = { id: 'it_' + Date.now(), name: name, type: type, limitMin: null, limitMax: null };
         if (type === 'ordinal') {
@@ -143,6 +154,7 @@ function addItem(catId) {
 function deleteItem(catId, itemId) {
     if (confirm("¿Eliminar viñeta?")) {
         const cat = appData.categories.find(c => c.id === catId);
+        if (!cat) return;
         cat.items = cat.items.filter(i => i.id !== itemId);
         saveData();
         renderCategories();
@@ -151,6 +163,7 @@ function deleteItem(catId, itemId) {
 
 function updateItemLabel(catId, itemId, level, value) {
     const cat = appData.categories.find(c => c.id === catId);
+    if (!cat) return;
     const item = cat.items.find(i => i.id === itemId);
     if (item && item.labels) {
         item.labels[level] = value;
@@ -160,6 +173,7 @@ function updateItemLabel(catId, itemId, level, value) {
 
 function updateItemLimit(catId, itemId, type, value) {
     const cat = appData.categories.find(c => c.id === catId);
+    if (!cat) return;
     const item = cat.items.find(i => i.id === itemId);
     if (item) {
         let numValue = value !== "" ? parseFloat(value) : null;

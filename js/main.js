@@ -2,36 +2,57 @@
 // MAIN - Inicialización de la app y Service Worker
 // =========================================================
 
-// --- PWA SERVICE WORKER REGISTRATION (MODO OFFLINE) ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('Service Worker registrado para modo offline.', reg))
-            .catch(err => console.error('Error en Service Worker:', err));
+            .then(reg => console.log('Service Worker registrado.', reg))
+            .catch(err => console.error('Error en SW:', err));
     });
 }
 
 window.onload = async () => {
-    // 1. Mostrar mapa e inicializar UI básica
-    initMap();
+    // 1. Cargar local primero y armar mapa
+    try {
+        if (typeof loadData === 'function') loadData();
+    } catch (e) {
+        console.warn('No se pudo cargar la data local:', e);
+    }
+
+    try {
+        if (typeof initMap === 'function') initMap();
+    } catch (e) {
+        console.warn('No se pudo inicializar el mapa:', e);
+    }
     
-    // 2. Forzar descarga de la nube antes de permitir el uso
+    // 2. Sincronizar con la nube
     try {
         const response = await fetch(CLOUD_API_URL);
-        if (!response.ok) throw new Error("Error en conexión");
+        if (!response.ok) throw new Error("Error HTTP");
         
         const cloudData = await response.json();
         if (cloudData && cloudData.zones && cloudData.categories) {
             appData = cloudData;
-            saveData(); // Guardar copia local fresca
+            if (typeof saveData === 'function') saveData();
         }
     } catch (error) {
-        console.error("Error al sincronizar al inicio:", error);
-        alert("⚠️ Sin conexión a la nube. Se usarán los datos guardados en este dispositivo, pero asegúrate de tener internet antes de evaluar.");
-        loadData(); // Cargar caché local si falla el internet
+        console.warn("Usando datos locales por falta de conexión.", error);
     } finally {
-        // 3. Ocultar pantalla de bloqueo y renderizar
-        document.getElementById('loadingOverlay').classList.add('opacity-0', 'pointer-events-none');
-        renderTreeTypesLite(); // Función adaptada (ver paso 3)
+        // 3. Quitar pantalla de carga
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.classList.add('opacity-0', 'pointer-events-none');
+
+        // Render seguros (con guard interno)
+        try { if (typeof renderTreeTypesLite === 'function') renderTreeTypesLite(); } catch (e) { console.warn(e); }
+        try { if (typeof renderZonesOnMap === 'function') renderZonesOnMap(); } catch (e) { console.warn(e); }
+        
+        // ✅ Forzar recálculo del mapa tras ocultar el overlay
+        setTimeout(() => {
+            if (typeof map !== 'undefined' && map) {
+                map.invalidateSize();
+                if (typeof drawnItems !== 'undefined' && drawnItems.getLayers().length > 0) {
+                    map.fitBounds(drawnItems.getBounds(), { padding: [20, 20] });
+                }
+            }
+        }, 500);
     }
 };
