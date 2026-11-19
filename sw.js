@@ -1,4 +1,4 @@
-const CACHE_NAME = 'agriscout-cache-v5'; // v5 para forzar la actualización del GPS
+const CACHE_NAME = 'agriscout-cache-v6'; // v6 para activar scroll en evaluación y cabecera fija
 const urlsToCache = [
     './',
     './index.html',
