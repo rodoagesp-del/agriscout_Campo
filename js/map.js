@@ -25,16 +25,24 @@ function initMap() {
     startGPS();
 }
 
+let gpsWatchId = null;
+
 function startGPS() {
     const statusEl = document.getElementById('gpsStatus');
     const retryGpsBtn = document.getElementById('retryGpsBtn');
     const centerMapBtn = document.getElementById('centerMapBtn');
 
-    // Solo interactúa con el botón si existe en el HTML
     if (retryGpsBtn) retryGpsBtn.classList.add('hidden');
+    if (statusEl) {
+        statusEl.innerHTML = `<i class="fa-solid fa-satellite-dish animate-pulse mr-2 text-blue-500"></i> Buscando satélites...`;
+    }
 
     if ("geolocation" in navigator) {
-        navigator.geolocation.watchPosition(
+        if (gpsWatchId !== null) {
+            navigator.geolocation.clearWatch(gpsWatchId);
+        }
+
+        gpsWatchId = navigator.geolocation.watchPosition(
             (position) => {
                 currentLocation = {
                     lat: position.coords.latitude,
@@ -81,28 +89,28 @@ function centerMapOnUser() {
 function renderZonesOnMap() {
     drawnItems.clearLayers();
     const listEl = document.getElementById('zonesList');
-    listEl.innerHTML = '';
+    if (listEl) listEl.innerHTML = '';
 
     appData.zones.forEach(zone => {
         if (zone.polygon && zone.polygon.length > 2) {
-            // ✅ MODIFICADO: Se añade zoneId al options para poder encontrarlo después
             L.polygon(zone.polygon, {
                 color: '#10b981', fillColor: '#10b981', fillOpacity: 0.2, weight: 3, zoneId: zone.id
             }).addTo(drawnItems).bindPopup(`<b>Sector: ${zone.name}</b>`);
         }
 
-        // ✅ MODIFICADO: Se añade botón de editar junto al de eliminar
-        listEl.innerHTML += `
-        <li class="py-3 flex justify-between items-center border-b last:border-0">
-            <div class="flex flex-col">
-                <span class="font-bold text-slate-700">${zone.name}</span>
-                <span class="text-xs text-slate-500"><i class="fa-solid fa-tree text-emerald-500"></i> ${zone.totalTrees || 0} árboles totales</span>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="toggleEditZone('${zone.id}', this)" class="text-blue-500 hover:bg-blue-50 p-2 rounded transition" title="Editar vértices"><i class="fa-solid fa-pen-to-square"></i></button>
-                <button onclick="deleteZone('${zone.id}')" class="text-red-500 hover:bg-red-50 p-2 rounded transition" title="Eliminar sector"><i class="fa-solid fa-trash"></i></button>
-            </div>
-        </li>`;
+        if (listEl) {
+            listEl.innerHTML += `
+            <li class="py-3 flex justify-between items-center border-b last:border-0">
+                <div class="flex flex-col">
+                    <span class="font-bold text-slate-700">${zone.name}</span>
+                    <span class="text-xs text-slate-500"><i class="fa-solid fa-tree text-emerald-500"></i> ${zone.totalTrees || 0} árboles totales</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="toggleEditZone('${zone.id}', this)" class="text-blue-500 hover:bg-blue-50 p-2 rounded transition" title="Editar vértices"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button onclick="deleteZone('${zone.id}')" class="text-red-500 hover:bg-red-50 p-2 rounded transition" title="Eliminar sector"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </li>`;
+        }
     });
 
     if (appData.evaluations && appData.evaluations.length > 0) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'agriscout-cache-v4'; // v4 para forzar la actualización
+const CACHE_NAME = 'agriscout-cache-v5'; // v5 para forzar la actualización del GPS
 const urlsToCache = [
     './',
     './index.html',
