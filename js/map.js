@@ -27,7 +27,12 @@ function initMap() {
 
 function startGPS() {
     const statusEl = document.getElementById('gpsStatus');
-    document.getElementById('retryGpsBtn').classList.add('hidden');
+    const retryGpsBtn = document.getElementById('retryGpsBtn');
+    const centerMapBtn = document.getElementById('centerMapBtn');
+
+    // Solo interactúa con el botón si existe en el HTML
+    if (retryGpsBtn) retryGpsBtn.classList.add('hidden');
+
     if ("geolocation" in navigator) {
         navigator.geolocation.watchPosition(
             (position) => {
@@ -36,7 +41,8 @@ function startGPS() {
                     lng: position.coords.longitude,
                     acc: position.coords.accuracy
                 };
-                document.getElementById('centerMapBtn').classList.remove('hidden');
+
+                if (centerMapBtn) centerMapBtn.classList.remove('hidden');
 
                 if (!userMarker) {
                     userMarker = L.circleMarker([currentLocation.lat, currentLocation.lng], {
@@ -49,14 +55,22 @@ function startGPS() {
                 } else {
                     userMarker.setLatLng([currentLocation.lat, currentLocation.lng]);
                 }
-                statusEl.innerHTML = `<i class="fa-solid fa-satellite-dish text-green-500"></i> GPS Activo (Prec. ${Math.round(currentLocation.acc)}m)`;
+
+                if (statusEl) {
+                    statusEl.innerHTML = `<i class="fa-solid fa-satellite-dish text-green-500"></i> GPS Activo (Prec. ${Math.round(currentLocation.acc)}m)`;
+                }
             },
             (error) => {
-                document.getElementById('retryGpsBtn').classList.remove('hidden');
-                statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-500"></i> Error de GPS. Permita la ubicación.`;
+                if (retryGpsBtn) retryGpsBtn.classList.remove('hidden');
+                if (statusEl) {
+                    statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-500"></i> Error de GPS. Permita la ubicación.`;
+                }
+                console.warn("No se pudo obtener la ubicación GPS", error);
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
+    } else {
+        console.warn("Geolocalización no soportada por el navegador");
     }
 }
 
